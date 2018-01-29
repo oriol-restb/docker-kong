@@ -1,0 +1,67 @@
+# Kong jwt-crafter tutorial
+
+# to install jwt-crafter install zip (probably can be done in the dockerfile so wee can have a smaller image)
+sudo docker exec -i -t compose_kong_1 /bin/bash
+
+cd usr/local/share/lua/5.1
+yum install zip unzip
+luarocks install kong-plugin-jwt-crafter
+
+
+# Set host and api name vars to avoid retyping them
+
+host=127.0.0.1
+login_api_name=signin_api
+
+# Create sign in API
+http POST $host:8001/apis name=$login_api_name uris="/signin" upstream_url=http://httpbin.org
+
+# Create consumer
+http POST $host:8001/consumers username=alice custom_id=alice@wonderland.com
+
+# Create JWT credential for consumer
+http POST $host:8001/consumers/alice/jwt
+
+# Create key auth credentials for consumer
+http POST $host:8001/consumers/alice/key-auth key=1111
+
+# Enable key auth for sign in API
+http POST $host:8001/apis/$login_api_name/plugins name=key-auth
+
+# Enable the JWT crafter plug-in
+http POST $host:8001/apis/$login_api_name/plugins name=jwt-crafter
+
+
+
+# Probar autenticación
+
+http $host:8000/signin apikey:1111
+http DELETE $host:8001/consumers/alice/key-auth/1111
+
+
+## Configurar api & jwt
+
+### Rgistrar un API
+
+http POST $host:8001/apis name=skywalkerDemo uris="/skywalkerDemo" upstream_url=http://httpbin.org strip_uri=true hosts=$host
+
+### Activar plugin jwt
+
+http POST $host:8001/apis/skywalkerDemo/plugins name=jwt
+
+
+## Probar token
+
+http $host:8000/skywalkerDemo/headers Host:$host Authorization:"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW0iOiJmMDgxOWViMC0zOTA3LTQ5N2QtODkwMC0zYTNmNDFmNTQ5ZjkiLCJzdWIiOiJjMWE0NWI3NS0xMmRiLTRkZTctOWRjNy1jMzBlNTgxOTBjZmUiLCJpc3MiOiJZMzNTZUphdFVZODg4dElOSjFGeVRUU3BDc3lRNHNhTCIsImV4cCI6MTUxNzI0OTM1NSwicm9sIjp7fX0.E221rcjyHAKRXbY53FUOQ-xv3XQ1WS6m0__jREcHwJo"
+
+
+# Modify api
+http PATCH $host:8001/apis/$login_api_name strip_uri=false
+http PATCH $host:8001/apis/skywalkerDemo/plugins/141866ea-6ceb-4178-91ae-53c02dad3938 config.secret_is_base64=false
+
+
+
+## References
+https://programar.cloud/post/demo-del-api-gateway-kong/
+https://gist.github.com/martinheld/5b6591a1abd4c5ef844d6bd4f6eb1879
+https://github.com/foodora/kong-plugin-jwt-crafter
